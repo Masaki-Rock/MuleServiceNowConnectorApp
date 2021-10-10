@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:java="http://www.mulesoft.org/schema/mule/java"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:servicenow="http://www.mulesoft.org/schema/mule/servicenow" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/servicenow http://www.mulesoft.org/schema/mule/servicenow/current/mule-servicenow.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="e81a8eab-8d8c-45a0-b6c4-8aa1a1f23a27" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<servicenow:config name="ServiceNow_Config" doc:name="ServiceNow Config" doc:id="eca5913a-ecc4-4337-86c9-7f711bf35c47" >
+		<servicenow:basic-connection username="admin" password="password" serviceAddress="https://devXXXXX.service-now.com" >
+		</servicenow:basic-connection>
+	</servicenow:config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="ffbbb325-f5cb-4ba6-8e12-edb19e9ae6a0" />
+	<flow name="SelectFlow" doc:id="c2217eca-ec8c-435d-8be6-c668cc6b1ab1" >
+		<http:listener doc:name="Listener" doc:id="9f02e317-a97a-47a6-a88e-5df5dec94aff" config-ref="HTTP_Listener_config" path="/select"/>
+		<servicenow:invoke doc:name="検索処理" doc:id="2a085ef8-ea39-4cc8-bc36-3ee7c168cf12" config-ref="ServiceNow_Config" service="incident" operation="getRecords" showReferenceValues="ALL">
+			<servicenow:message >
+				<servicenow:body ><![CDATA[#[output application/xml
+ns ns0 http://www.service-now.com/incident
+---
+{
+	ns0#getRecords: {
+		"__encoded_query": payload,
+	}
+}]]]></servicenow:body>
+			</servicenow:message>
+		</servicenow:invoke>
+		<ee:transform doc:name="レスポンス検索処理" doc:id="eb47a3c5-decc-4160-91fb-5a75868f02ff" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.body.getRecordsResponse.*getRecordsResult]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="InsertFlow" doc:id="ef9a3210-1a67-4b76-832e-776694d3e76e" >
+		<http:listener doc:name="Listener" doc:id="bf488afc-cb5b-4feb-9f16-9aa34ef9df51" config-ref="HTTP_Listener_config" path="/insert" />
+		<servicenow:invoke service="incident" operation="insert" doc:name="登録処理" doc:id="996b55c5-1289-4c96-9537-1003ebfab89a" config-ref="ServiceNow_Config" showReferenceValues="ALL" >
+			<servicenow:message >
+				<servicenow:body ><![CDATA[#[output application/xml
+ns ns0 http://www.service-now.com/incident
+---
+{
+	ns0#insert: {
+		number: payload.number
+	}
+}]]]></servicenow:body>
+			</servicenow:message>
+		</servicenow:invoke>
+		<ee:transform doc:name="レスポンス編集処理" doc:id="1dbd25d6-1e5c-45d2-ba38-0a2fcc0239fe" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.body]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="DeleteFlow" doc:id="d8a9600e-77ed-4d10-b6fb-eef9e3611ab0" >
+		<http:listener doc:name="Listener" doc:id="2e8c3ade-f7e7-4248-8f05-6faf27bfad10" config-ref="HTTP_Listener_config" path="/delete"/>
+		<servicenow:invoke service="incident" operation="deleteRecord" doc:name="削除処理" doc:id="80ef9269-fe7a-4efc-8137-14b9b25338a5" config-ref="ServiceNow_Config" showReferenceValues="FALSE">
+			<servicenow:message >
+				<servicenow:body ><![CDATA[#[output application/xml
+ns ns0 http://www.service-now.com/incident
+---
+{
+	ns0#deleteRecord: {
+		sys_id: payload.sys_id
+	}
+}]]]></servicenow:body>
+			</servicenow:message>
+		</servicenow:invoke>
+		<ee:transform doc:name="レスポンス編集処理" doc:id="2575c1f0-0ce4-40bc-a8ad-4e09aeb0173d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.body]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="AttachmentFlow" doc:id="711ac449-43cd-49a5-966e-d585aca2f0b9" >
+		<http:listener doc:name="Listener" doc:id="c203475d-603f-45ef-abe3-7213c5904b73" config-ref="HTTP_Listener_config" path="/attachment/{sysId}"/>
+		<set-variable value='#[attributes.uriParams.sysId]' doc:name="SysID設定処理" doc:id="f6676dab-f17f-40b6-b5ec-48831a273a9e" variableName="sysId"/>
+		<file:read doc:name="ファイル読み込み処理" doc:id="44e70dc0-5c34-4438-a006-915dd8190558" config-ref="File_Config" path="C:\Users\masaki.kawaguchi\OneDrive - Accenture\workspace1\workspace_as_aflac2\servicenow-app\src\main\resources\work.xlsx"/>
+		<servicenow:invoke service="ecc_queue" operation="insert" doc:name="添付ファイル登録処理" doc:id="70bf0795-0402-49c2-a351-29d9aa159a05" config-ref="ServiceNow_Config">
+			<servicenow:message>
+				<servicenow:body ><![CDATA[#[%dw 2.0
+output application/xml
+import toBase64 from dw::core::Binaries
+ns ns0 http://www.service-now.com/ecc_queue
+---
+ns0#insert: {
+    agent: "AttachmentCreator",
+    topic: "AttachmentCreator",
+    name: "work.xlsx",
+    source: "incident:" ++ vars.sysId default "" as String,
+    payload: toBase64(payload)
+}]]]></servicenow:body>
+			</servicenow:message>
+		</servicenow:invoke>
+		<ee:transform doc:name="レスポンス返却処理" doc:id="f43ff161-3c08-449b-a400-c628d8f1551f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
